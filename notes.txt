@@ -1,0 +1,3 @@
+ATDF: If the camera is moving -> remove it/change params
+
+gcc -fPIC
