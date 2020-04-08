@@ -6,6 +6,7 @@ from enum import Enum
 from abc import ABC, abstractmethod
 import webserver
 import cv2 as cv
+from video_filters import Filters
 
 class CaptureMode(Enum):
     PIPESTREAM = 'pipe stream'
@@ -17,7 +18,7 @@ class Stream(ABC):
 
     def __init__(self, camera):
         self.to_close = [] # List of things to apply .close() on them when closing the stream
-        self.filters  = []
+        self.filters  = camera.filters
         self.current_frame = None
 
         self.camera = camera
@@ -30,6 +31,18 @@ class Stream(ABC):
         self.heigth         = self.current_frame.shape[0]
         self.width          = self.current_frame.shape[1]
 
+    def save_frame(self, filename, secure=False):
+        if not secure and os.path.exists(filename):
+            os.remove(filename)
+
+        frame = self.read()
+        plt.imsave(filename, frame)
+        return filename
+
+    def show_frame(self):
+        frame = self.read()
+        plt.matshow(frame)
+        plt.show()
 
     def add_filter(self, filter_f):
         self.filters.append(filter_f)
@@ -103,6 +116,9 @@ class PipeStream(Stream):
 ############# Camera wrappers ###############
 
 class Camera(ABC):
+    
+    def __init__(self):
+        self.filters = []
 
     def __repr__(self):
         return "<{}>".format(self.__class__.__name__)
@@ -111,6 +127,7 @@ class WebcamCamera(Camera):
     CAPTURE_MODES = [CaptureMode.LIVESTREAM]
 
     def __init__(self, cam_id=0):
+        super().__init__()
         self.capture = cv.VideoCapture(cam_id)
 
     def read(self):
@@ -134,7 +151,8 @@ class OpgalCamera(PipedCamera):
     ROWS   = 384
 
     def __init__(self):
-        pass
+        super().__init__()
+        self.filters.append(Filters.flip_horizontal)
 
     def read_frame_file(self, filename):
         fdump  = open(filename, 'r')
@@ -158,4 +176,11 @@ class OpgalCamera(PipedCamera):
 if __name__ == "__main__":
     camera = WebcamCamera(0)
     stream = WebcamStream(camera)
-    stream.display()
+
+    therm_cam = OpgalCamera()
+    stream2 = PipeStream(therm_cam, '/opt/eyerop/bin/camera_out')
+
+    stream.save_frame('rgbframe.png')
+    stream2.save_frame('thermframe.png')
+
+
