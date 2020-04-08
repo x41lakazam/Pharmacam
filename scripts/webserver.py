@@ -1,26 +1,53 @@
 import flask
+import socket
 
-import frames_io_handler as io
+class SocketStream:
 
-app = flask.Flask('thermappmd')
-app.config['SECRET_KEY'] = 'thermapp'
+    def __init__(self, stream, host='0.0.0.0', port=8687):
+        self.stream     = stream
+        self.socket     = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_add = (host, port)
+        self.connections = []
+        self.alive = True
+   
+    def run(self):
+        self.socket.listen(1)
 
+        while self.alive:
+            conn, client_add = self.socket.accept()
+            self.connections.append(conn)
+            frame = self.stream.read()
+            self.socket.sendall(frame)
 
-FRAME_PATH = '/home/debian/opgal/dump'
+        self.socket.close()
 
-@app.route('/')
-def home():
-    msg = 'To get the last frame, fetch: <a href="{0}">{0}</a>'.format(flask.url_for('last_frame'))
-    return msg
+    def close():
+        print("[Webserver] Socket closed.")
+        self.alive = False
 
-@app.route('/last_frame')
-def last_frame():
-    last_frame = io.get_last_frame(FRAME_PATH)
-    print(last_frame)
-    return flask.send_file(last_frame)
+class WebServerStream:
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    def __init__(self, stream, name='WebCam', host='0.0.0.0', port=8686):
+        self.stream = stream
 
+        self.name = name
+        self.host = host
+        self.port = port
 
+        self.app = flask.Flask(self.name)
 
+        @self.app.route('/read')
+        def read():
+            frame = self.stream.read()
+            response = flask.make_response(frame.tobytes())
+            response.headers.set('Content-Type', 'application/octet-stream')
+            
+            return response
+
+        @self.app.route('/')
+        def home():
+            msg = 'To read the stream, fetch: <a href="{0}">{0}</a>'.format(flask.url_for('read'))
+            return msg
+
+    def run(self): 
+        self.app.run(host=self.host, port=self.port)
