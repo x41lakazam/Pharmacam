@@ -1,4 +1,5 @@
 import tkinter as tk
+import ttk
 from functools import partial
 from tkinter import ttk
 import numpy as np
@@ -18,10 +19,10 @@ from face_detector import Person # Debug - remov
 
 # Blocks
 
-class Module(tk.Frame):
+class Module(ttk.Frame):
 
     def __init__(self, master, *args, **kwargs):
-        tk.Frame.__init__(self, master, *args, **kwargs)
+        ttk.Frame.__init__(self, master, *args, **kwargs)
 
     def close(self):
         return
@@ -67,24 +68,24 @@ class CalibrationFrame(Module):
         box_properties = dict(height=1, width=4, padx=10, pady=10) 
 
         self.panel1_coords = (-1, -1) 
-        self.panel1_textbox = tk.Text(self, **box_properties)
-        self.panel1_label = tk.Label(self, text="Panel 1 (unselected):")
+        self.panel1_textbox = ttk.Text(self, **box_properties)
+        self.panel1_label = ttk.Label(self, text="Panel 1 (unselected):")
         self.panel1_label.grid(row=0, column=0)
         self.panel1_textbox.grid(row=0, column=1)
         
         self.panel2_coords = (-1, -1) 
-        self.panel2_textbox = tk.Text(self, **box_properties)
-        self.panel2_label = tk.Label(self, text="Panel 2 (unselected:")
+        self.panel2_textbox = ttk.Text(self, **box_properties)
+        self.panel2_label = ttk.Label(self, text="Panel 2 (unselected:")
         self.panel2_label.grid(row=1, column=0)
         self.panel2_textbox.grid(row=1, column=1)
         
-        self.explain_panel = tk.Label(self, text="To define a panel point, put the cursor on it and press L (for panel 1) or H (for panel 2), then enter their temperature")
+        self.explain_panel = ttk.Label(self, text="To define a panel point, put the cursor on it and press L (for panel 1) or H (for panel 2), then enter their temperature")
         self.explain_panel.grid(row=2, column=0)
 
    
     @property 
     def panel1_temperature(self):
-        val = self.panel1_textbox.get('1.0', tk.END)
+        val = self.panel1_textbox.get('1.0', ttk.END)
         try:
             return float(val)
         except:
@@ -92,7 +93,7 @@ class CalibrationFrame(Module):
 
     @property
     def panel2_temperature(self):
-        val = self.panel2_textbox.get('1.0', tk.END)
+        val = self.panel2_textbox.get('1.0', ttk.END)
         try:
             return float(val)
         except:
@@ -151,12 +152,12 @@ class VideoFrame(Module):
         colors =  list(Filters.cv_colors.keys()).copy()
 
         self.selected_color.set('Jet')
-        self.color_select = tk.OptionMenu(self, self.selected_color, *colors) 
+        self.color_select = ttk.OptionMenu(self, self.selected_color, *colors) 
         
         self.color_select.grid(row=0, column=0)
         
     def init_panel(self):
-        self.panel = tk.Label(self, anchor=tk.NW, cursor='tcross')
+        self.panel = ttk.Label(self, anchor=tk.NW, cursor='tcross')
         self.panel.grid(row=2, column=0)
 
         # Bind Enter to  --> Focus panel
@@ -171,7 +172,7 @@ class VideoFrame(Module):
     def init_ready_label(self):
         self.ready_text = tk.StringVar()
         self.ready_set.set("Not ready to measure temperature.")
-        self.ready_label = tk.Label(self, textvariable=self.ready_text)
+        self.ready_label = ttk.Label(self, textvariable=self.ready_text)
         self.ready_label.grid(row=3, column=0)
 
     def focus_panel(self, event):
@@ -312,7 +313,7 @@ class VideoDashboardFrame(Module):
         self.current_temp = tk.StringVar()
         self.current_temp.set("Temperature: 0")
 
-        self.temp_label = tk.Label(self, textvariable=self.current_temp)
+        self.temp_label = ttk.Label(self, textvariable=self.current_temp)
         self.temp_label.grid(row=1, column=0)
 
         # Calibration frame
@@ -392,10 +393,10 @@ class VideoDashboardFrame(Module):
 
     def widget_press_callback(self, event, widget):
 
-        if event.type == tk.EventType.Motion:
+        if event.type == ttk.EventType.Motion:
             self.panel_motion_callback(event, widget)
 
-        elif event.type == tk.EventType.KeyPress:
+        elif event.type == ttk.EventType.KeyPress:
             self.panel_press_callback(event, widget)
 
         else:
@@ -491,15 +492,15 @@ class ReportFrame(Module):
         self.init_urgent_list()
     
     def init_current_list(self):
-        self.current_label = tk.Label(self, text="In-Frame report:")
+        self.current_label = ttk.Label(self, text="In-Frame report:")
         self.current_label.grid(row=0, column=0)
-        self.current_list = tk.Text(self, height=10, width=15)
+        self.current_list = ttk.Text(self, height=10, width=15)
         self.current_list.grid(row=1, column=0)
 
     def init_urgent_list(self):
-        self.urgent_label = tk.Label(self, text="Urgent report:")
+        self.urgent_label = ttk.Label(self, text="Urgent report:")
         self.urgent_label.grid(row=2, column=0)
-        self.urgent_list = tk.Text(self, height=10, width=15)
+        self.urgent_list = ttk.Text(self, height=10, width=15)
         self.urgent_list.grid(row=3, column=0)
 
     def add_person(self, person, target='current'):
@@ -518,9 +519,9 @@ class ReportFrame(Module):
             self.urgent_persons.append(person)
             widget = self.urgent_list
 
-        ix_before = widget.index(tk.END)
-        widget.insert(tk.END, message)
-        ix_after  = widget.index(tk.END)
+        ix_before = widget.index(ttk.END)
+        widget.insert(ttk.END, message)
+        ix_after  = widget.index(ttk.END)
         widget.tag_add(person.name, ix_before, ix_after)
             
     def remove_person(self, person, target='current'):
