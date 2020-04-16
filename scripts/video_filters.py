@@ -64,16 +64,16 @@ class Filters:
         half_size = size // 2
         # Horizontal
         for n in range(-half_size, half_size+1):
-            x = coords[1] + n
+            x = int(coords[1] + n)
             for yshift in range(-thickness // 2, (thickness // 2)+1):
-                y = coords[0] + yshift
+                y = int(coords[0] + yshift)
                 frame[x][y] = color
 
         # Vertical
         for n in range(-half_size, half_size+1):
-            y = coords[0] + n
+            y = int(coords[0] + n)
             for xshift in range(-thickness // 2, (thickness // 2)+1):
-                x = coords[1] + xshift
+                x = int(coords[1] + xshift)
                 frame[x][y] = color
         frame[coords[1]][coords[0]] = color
         return frame

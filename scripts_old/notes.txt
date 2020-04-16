@@ -10,7 +10,4 @@ Streams:
 Streams are defined given the read mode of camera
 - PipeStream --> Reads data from a named, pipe, compatible with PIPESTREAM cameras.
 
-TODO
 
--face detection --> eyes
--hands detection

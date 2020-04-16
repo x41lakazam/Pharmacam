@@ -49,7 +49,7 @@ class App(Module):
     def bindings(self):
 
         # Bind click to --> change temperature
-        self.therm_frame.panel.bind('<Button-1>', self.pick_temperature)
+        self.rgb_frame.panel.bind('<Button-1>', self.pick_temperature)
 
     def close(self):
 
@@ -80,14 +80,23 @@ class CalibrationFrame(Module):
         
         self.explain_panel = tk.Label(self, text="To define a panel point, put the cursor on it and press L (for panel 1) or H (for panel 2), then enter their temperature")
         self.explain_panel.grid(row=2, column=0)
+
    
     @property 
     def panel1_temperature(self):
-        return float(self.panel1_textbox.get('1.0', tk.END)) 
+        val = self.panel1_textbox.get('1.0', tk.END)
+        try:
+            return float(val)
+        except:
+            return False
 
     @property
     def panel2_temperature(self):
-        return float(self.panel2_textbox.get('1.0', tk.END)) 
+        val = self.panel2_textbox.get('1.0', tk.END)
+        try:
+            return float(val)
+        except:
+            return False
 
     def select_panel1(self, x, y):
         self.panel1_label['text'] = "Panel 1 ({}, {}):".format(x,y)
@@ -141,13 +150,13 @@ class VideoFrame(Module):
     def init_color_select(self):
         colors =  list(Filters.cv_colors.keys()).copy()
 
-        self.selected_color.set('None')
+        self.selected_color.set('Jet')
         self.color_select = tk.OptionMenu(self, self.selected_color, *colors) 
         
         self.color_select.grid(row=0, column=0)
         
     def init_panel(self):
-        self.panel = tk.Label(self, anchor=tk.NW)
+        self.panel = tk.Label(self, anchor=tk.NW, cursor='tcross')
         self.panel.grid(row=2, column=0)
 
         # Bind Enter to  --> Focus panel
@@ -156,8 +165,20 @@ class VideoFrame(Module):
         # Bind Key to  --> key_press_handler
         self.panel.bind('<Key>', self.key_press_handler)
 
+        # Bind motion to --> motion_handler
+        self.panel.bind('<Motion>', self.motion_handler)
+
+    def init_ready_label(self):
+        self.ready_text = tk.StringVar()
+        self.ready_set.set("Not ready to measure temperature.")
+        self.ready_label = tk.Label(self, textvariable=self.ready_text)
+        self.ready_label.grid(row=3, column=0)
+
     def focus_panel(self, event):
         self.panel.focus_set()
+
+    def motion_handler(self, event):
+        self.master.widget_press_callback(event, self)
 
     def key_press_handler(self, event):
         self.master.widget_press_callback(event, self)
@@ -189,7 +210,14 @@ class VideoFrame(Module):
         # Take all the filters from the dashboard
         if self.filter_feed:
             for f in self.filter_feed.get_filters():
+                #try:
+                #    frame = f(frame)
+                #except Exception as e:
+                #    print("Failed to apply filter", f)
+                #    print(str(e))
+                #333 Above is better, but for debugging, lets remove the try
                 frame = f(frame)
+
 
         return frame
     
@@ -251,13 +279,13 @@ class VideoDashboardFrame(Module):
         """
         EVERY PIXEL IS BASED ON THE RGB FRAME AND THEN CONVERTED TO THERM COORDS
         """
-        self.mask_filters = {'rgb': None, 'therm':None}
+        self.runtime_filters = {'rgb': [], 'therm':[]}
 
         super().__init__(master)
         
         # Video 1 (RGB)
 
-        rgb_camera               = capture.WebcamCamera()
+        rgb_camera               = capture.WebcamCamera(cam_id=1)
         self.rgb_stream          = capture.WebcamStream(rgb_camera)
 
         self.rgb_filters         = FilterFeed()
@@ -276,6 +304,9 @@ class VideoDashboardFrame(Module):
                                                     filter_feed=self.therm_filters)
        
         self.therm_frame.grid(row=0, column=1, padx=10, pady=10)
+
+        # Cursor of rgb on thermal
+        self.corresponding_cursor = (100,100)
         
         # Temperature label
         self.current_temp = tk.StringVar()
@@ -290,6 +321,11 @@ class VideoDashboardFrame(Module):
 
         self.img_matching_pts = {'rgb':[None, None, None], 'therm':[None, None, None]}
 
+        self.init_bindings()
+
+    def init_bindings(self):
+        self.rgb_frame.panel.bind('<Button-1>', self.pick_temperature)
+
     def close(self):
         self.rgb_stream.close()
         self.therm_stream.close()
@@ -303,11 +339,30 @@ class VideoDashboardFrame(Module):
         else:
             widget = self.therm_frame
 
+    def check_readiness(self):
+        if None in self.img_matching_pts['rgb'] or None in self.img_matching_pts['therm']:
+            return False
+        if not self.calibration_frame.panel1_temperature or not self.calibration_frame.panel2_temperature:
+            return False
+
+        self.ready_text.set("Ready to measure temperature")
+        return True
+
     def get_matching_points(self, widget):
         if widget == self.rgb_frame:
             return self.img_matching_pts['rgb'] 
         elif widget == self.therm_frame:
             return self.img_matching_pts['therm'] 
+    
+    def convert_point_rgb2therm(self, point):
+        rgb_3points = self.img_matching_pts['rgb']
+        therm_3points = self.img_matching_pts['therm']
+
+        if None in rgb_3points or None in therm_3points:
+            return None 
+
+        converted_p = utils.camera_project_point(rgb_3points, therm_3points, point)
+        return converted_p
 
     def update_mask_filters(self):
         self.rgb_filters.clean()
@@ -323,8 +378,49 @@ class VideoDashboardFrame(Module):
                 continue
             self.therm_filters.create_filter(Filters.draw_x, matching_pt,
                                             color=255, size=15, thickness=2)
+        
+        self.therm_filters.create_filter(Filters.draw_x, self.corresponding_cursor, color=255, size=25, thickness=2)
+
+#        for filt in self.runtime_filters['rgb']:
+#            self.rgb_filters.add_filter(filt)
+#        
+#        for filt in self.runtime_filters['therm']:
+#            self.therm_filters.add_filter(filt)
+
+        self.runtime_filters = {'rgb':[], 'therm':[]}
+
 
     def widget_press_callback(self, event, widget):
+
+        if event.type == tk.EventType.Motion:
+            self.panel_motion_callback(event, widget)
+
+        elif event.type == tk.EventType.KeyPress:
+            self.panel_press_callback(event, widget)
+
+        else:
+            #333
+            print("Uncaught Event")
+            print("Event:", type(event.type))
+            print("Event name:", event.type)
+
+        self.update_mask_filters()
+
+    def panel_motion_callback(self, event, widget):
+        """
+        Draw the position of the rgb cursor on the therm frame
+        """
+        mouse_pos = (event.x, event.y)
+        converted_pos = self.convert_point_rgb2therm(mouse_pos)
+        if widget == self.rgb_frame:
+            if converted_pos is not None:
+                #filt = lambda f: Filters.draw_x(f, converted_pos, color=255, size=13, thickness=3)
+                #filt.__name__ = "CorrespondingCursorDraw"
+                #self.runtime_filters['rgb'].append(filt)
+                self.corresponding_cursor = tuple(converted_pos)
+
+
+    def panel_press_callback(self, event, widget):
         char = event.char.lower()
         if widget == self.rgb_frame:
             fmap = {
@@ -341,19 +437,30 @@ class VideoDashboardFrame(Module):
                 '3':partial(self.select_matching_point, x=event.x, y=event.y, pic='therm', ix=2),
             }
         
-        print("Pressed", char)
         if char in fmap.keys():
             f=fmap[char]
             f()
 
-        self.update_mask_filters()
 
     def select_temp_panel1(self, x,y):
+        """
+        PIXELS ARE RGB --> CONVERT THEM
+        """
+        therm_pt = self.convert_point_rgb2therm((x,y))
+        self.calibration_frame.select_panel1(*therm_pt)
+
+        self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
         self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
 
     def select_temp_panel2(self, x,y):
+        """
+        PIXELS ARE RGB --> CONVERT THEM
+        """
+        therm_pt = self.convert_point_rgb2therm((x,y))
+        self.calibration_frame.select_panel2(*therm_pt)
+
+        self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
         self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
-        print("Selected panel 2")
 
     def get_temperature(self, frame, point):
         return self.calibration_frame.get_temperature(frame, point)
@@ -362,18 +469,12 @@ class VideoDashboardFrame(Module):
         """
         Pixel is related to rgb 
         """
-        # TODO --> convert pixels
-        temp = self.get_temperature(self.stream.current_frame, (event.x, event.y))
+        # Convert pixel
+        point = (event.x, event.y)
+        converted_point = self.convert_point_rgb2therm(point)
+        temp = self.get_temperature(self.therm_stream.current_frame, converted_point)
         self.update_temperature(temp)
         return temp
- 
-    def select_temp_panel1(self, x, y):
-        # TODO --> convert pixels
-        self.calibration_frame.select_panel1(x, y)
-
-    def select_temp_panel2(self, x, y):
-        # TODO --> convert pixels
-        self.calibration_frame.select_panel2(x, y)
 
     def update_temperature(self, temperature):
         self.current_temp.set("Temperature: {:2.1f}".format(temperature))
@@ -434,7 +535,7 @@ class ReportFrame(Module):
 
 
 root = tk.Tk()
-root.geometry("1200x800")
+root.geometry("1500x800")
 root.wm_title('Temperature check')
 
 main = App(root)

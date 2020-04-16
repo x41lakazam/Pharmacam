@@ -11,7 +11,7 @@ def calibrate_temperature(temp1, temp2, px1_val, px2_val):
     """
     m = (temp1 - temp2) / (px1_val - px2_val) 
 
-    p = self.panel1_temperature - m * px2_val
+    p = temp1 - m * px2_val
     temp_function = lambda dl: m*dl + p
 
     return temp_function
@@ -41,8 +41,25 @@ def find_matching_pts(img1, img2, draw=False, n_matching=3):
     return matches[:n_matching]
 
 def camera_project_point(cam1_3points, cam2_3points, point_to_convert):
+    cam1_3points = np.float32(cam1_3points)
+    cam2_3points = np.float32(cam2_3points)
     transform_mat = cv.getAffineTransform(cam1_3points, cam2_3points)
-    return cv.transform(point_to_convert, transform_mat)
+    converted = np.dot(transform_mat, np.array([point_to_convert[0], point_to_convert[1], 1])) # From the equation of the opencv doc cv.GetAffineTranform
+    #points = np.float32([point_to_convert])
+    #converted = np.zeros_like(points)
+    #cv.transform(points, converted, transform_mat)
+    #converted = converted[0]
+
+    converted = np.uint(converted)
+
+    #333
+    #print("Cam 1 points:", cam1_3points)
+    #print("Cam 2 points:", cam2_3points)
+    #print("Transform mat:", transform_mat)
+    #print("Point to convert:", point_to_convert)
+    #print("Converted:", converted)
+
+    return converted
 
 if __name__ == "__main__":
     # Test matching pts

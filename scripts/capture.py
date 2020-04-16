@@ -67,6 +67,9 @@ class Stream(ABC):
     
     def read(self, *args, **kwargs):
         frame = self._read(*args, **kwargs)
+        if frame is None:
+            print("Cant read from", self)
+            return None
         self.current_frame = frame.copy()
         for f in self.filters:
             frame = f(frame)
