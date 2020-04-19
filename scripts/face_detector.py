@@ -2,7 +2,6 @@ import numpy as np
 import cv2 as cv
 import os 
 import time
-import face_recognition
 import sys
 
 from setup import Setup
@@ -47,9 +46,9 @@ def generate_data(n, out_dir, sleep=.2, background=False, gen_info=False):
  
 def detect_faces(frame):
     # With haar cascade
-    cascade = cv.CascadeClassifier(Setup.FD_HAAR_MODEL,)
-    landmarks = cascade.detectMultiScale(frame, 1.05, 3)
-    return landmarks
+    #cascade = cv.CascadeClassifier(Setup.FD_HAAR_MODEL,)
+    #landmarks = cascade.detectMultiScale(frame, 1.05, 3)
+    #return landmarks
 
     # With face_recognition module
     """
@@ -68,9 +67,9 @@ def detect_faces(frame):
         mid_fhead = [mid_eyes[0] + eye_eyebrow_vec[0], mid_eyes[1] + eye_eyebrow_vec[1]]
         fheads.append(mid_fhead)
     """ 
-    return fheads
+    #return fheads
         
-    return face_boundaries
+    #return face_boundaries
 
 def classify_faces(frame, known_faces):
     pass
