@@ -39,6 +39,7 @@ class App(Module):
         self.modules.append(self.video_dashboard)
 
         self.video_dashboard.grid(row=0, column=1)
+
         # Add report frame
         #self.report_frame = ReportFrame(self)
         #self.report_frame.grid(row=1, column=0, padx=10, pady=10)
@@ -202,7 +203,7 @@ class VideoFrame(Module):
         frame = Filters.convert_to_uint8(frame)
 
         # Apply face detection
-        #frame = Filters.face_detection(frame)
+        frame = Filters.face_detection(frame)
 
         # Blur frame
         #frame = Filters.blur(frame)
@@ -212,19 +213,16 @@ class VideoFrame(Module):
             frame = Filters.color_filter(frame, self.selected_color.get())
 
         # Take all the filters from the dashboard
-        if self.filter_feed:
-            for f in self.filter_feed.get_filters():
-                #try:
-                #    frame = f(frame)
-                #except Exception as e:
-                #    print("Failed to apply filter", f)
-                #    print(str(e))
-                #333 Above is better, but for debugging, lets remove the try
-                frame = f(frame)
+        for feed in (self.filter_feed, self.perma_filter_feed):
+            if feed:
+                for f in feed.get_filters():
+                    try:
+                        frame = f(frame)
+                    except Exception as e:
+                        print("Failed to apply filter", f)
+                        print(str(e))
+                    #333 Above is better, but for debugging, lets remove the try
 
-        if self.perma_filter_feed:
-            for f in self.perma_filter_feed.get_filters():
-                frame = f(frame)
 
         return frame
     
@@ -342,7 +340,7 @@ class VideoDashboardFrame(Module):
         self.therm_frame.grid(row=0, column=1, padx=10, pady=10)
 
         # Cursor of rgb on thermal
-        self.corresponding_cursor = (100,100)
+        self.corresponding_cursor = None
         
         # Temperature label
         self.current_temp = tk.StringVar()
@@ -415,9 +413,11 @@ class VideoDashboardFrame(Module):
                 continue
             filt = self.therm_filters.create_filter(Filters.draw_x, matching_pt,
                                             color=255, size=15, thickness=2)
-            self.rgb_filters.add_filter(filt, index=0)
-        
-        self.therm_filters.create_filter(Filters.draw_x, self.corresponding_cursor, color=255, size=25, thickness=2)
+            self.therm_filters.add_filter(filt, index=0)
+       
+        if self.corresponding_cursor:
+            filt = self.therm_filters.create_filter(Filters.draw_x, self.corresponding_cursor, color=255, size=25, thickness=2)
+            self.therm_filters.add_filter(filt, name="CorrespondingCursor")
 
 #        for filt in self.runtime_filters['rgb']:
 #            self.rgb_filters.add_filter(filt)
@@ -452,9 +452,9 @@ class VideoDashboardFrame(Module):
         converted_pos = self.convert_point_rgb2therm(mouse_pos)
         if widget == self.rgb_frame:
             if converted_pos is not None:
-                #filt = lambda f: Filters.draw_x(f, converted_pos, color=255, size=13, thickness=3)
-                #filt.__name__ = "CorrespondingCursorDraw"
-                #self.runtime_filters['rgb'].append(filt)
+                filt = lambda f: Filters.draw_x(f, converted_pos, color=255, size=13, thickness=3)
+                filt.__name__ = "CorrespondingCursorDraw"
+                self.runtime_filters['rgb'].append(filt)
                 self.corresponding_cursor = tuple(converted_pos)
 
 

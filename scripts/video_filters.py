@@ -37,11 +37,7 @@ class Filters:
         faces = face_detector.detect_faces(frame)
         for (x,y,w,h) in faces:
             frame = cv.rectangle(frame, (x,y), (x+w, y+h), (255,0,0), 2)
-#        for (x,y) in faces:
-#            print("FACE AT:", (x,y))
-#            frame = Filters.draw_x(frame, (x,y), color=255, size=30, thickness=3)
-#            frame = cv.rectangle(frame, (x,y), (x+w, y+h), (255,0,0), 2)
-        
+
         return frame
    
     @staticmethod 
@@ -134,6 +130,14 @@ class Filters:
 
         zoomed_frame = cv.resize(cropped_frame, (window_size, window_size))
 
+        # Add cursor
+        zf_mid = (
+            zoomed_frame.shape[0] // 2,
+            zoomed_frame.shape[1] // 2
+        )
+
+        zoomed_frame = Filters.draw_x(zoomed_frame, zf_mid, color=255, size=5, thickness=1)
+
         # --> Display it above coords
         # Window coords
         half_win    = window_size // 2
@@ -160,6 +164,8 @@ class Filters:
             win_topleft[0]:win_topleft[0]+window_size,
             win_topleft[1]:win_topleft[1]+window_size,
         ] = zoomed_frame
+
+
 
         # Draw bounding box (coords are reverted bc its X,Y)
         # TODO -- not working
