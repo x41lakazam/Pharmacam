@@ -1,6 +1,8 @@
 import cv2 as cv
 import numpy as np
 
+import face_detector
+
 class Filters:
     """ 
     Filters are functions that receive frames, and return frames

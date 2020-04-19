@@ -51,25 +51,8 @@ def detect_faces(frame):
     #return landmarks
 
     # With face_recognition module
-    """
-    landmarks_multi = face_recognition.face_landmarks(frame)
-    fheads = []
-    for landmarks in landmarks_multi:
-        reye     = landmarks['right_eye'][0]
-        reyebrow = landmarks['right_eyebrow'][0]
-        leyebrow = landmarks['left_eyebrow'][0]
-        
-        mid_eyes = [(reyebrow[0] - leyebrow[0])//2 ,  (reyebrow[1] + leyebrow[1]) // 2]
-        eye_eyebrow_vec = [
-                        reyebrow[0] - reye[0], 
-                        reyebrow[1] - reye[1] 
-                    ] 
-        mid_fhead = [mid_eyes[0] + eye_eyebrow_vec[0], mid_eyes[1] + eye_eyebrow_vec[1]]
-        fheads.append(mid_fhead)
-    """ 
-    #return fheads
-        
-    #return face_boundaries
+    return {}
+
 
 def classify_faces(frame, known_faces):
     pass

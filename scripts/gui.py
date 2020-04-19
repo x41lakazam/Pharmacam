@@ -181,10 +181,9 @@ class VideoFrame(Module):
         self.perma_filter_feed.remove_filter('zoom_glass')
 
     def motion_handler(self, event):
-        self.perma_filter_feed.remove_filter('zoom_glass')
         self.master.widget_press_callback(event, self)
         zoomglass_filter = lambda f: Filters.zoom_glass(f, coords=(event.x, event.y))
-        self.perma_filter_feed.add_filter(zoomglass_filter, name="zoom_glass")
+        self.perma_filter_feed.add_filter(zoomglass_filter, name="zoom_glass", overwrite=True)
 
     def key_press_handler(self, event):
         self.master.widget_press_callback(event, self)
@@ -260,15 +259,29 @@ class FilterFeed():
         self.filters = []
         self.filters_names = {}
     
-    def add_filter(self, f, index=-1, name=None):
+    def add_filter(self, f, index=-1, name=None, overwrite=False):
+        """
+        TODO: DOESNT WORK
+        """
+
+        if name:
+            if name in self.filters_names.keys():
+                print("NAME:", name)
+                print("Name is here:", self.filters_names)
+                if overwrite: self.remove_filter(name)
+                else: return False
+
+
         if index != -1:
             for filter_name, filter_ix in self.filters_names.items():
                 if filter_ix >= index:
                     self.filters_names[filter_name] += 1
 
+
         self.filters.insert(index, f)
-        if name:
-            self.filters_names[name] = index
+        if index <= 0:
+            index = len(self.filters) - index
+        self.filters_names[name] = index
 
     def create_filter(self, func, *args, **kwargs):
         """
@@ -281,7 +294,15 @@ class FilterFeed():
     def remove_filter(self, name):
         """
         Can only be performed if filter has a name.
+        TODO: DOESNT WORK
         """
+        # Rearange
+        for fname, fix in self.filters_names.items():
+            print("Try, ix is", fix)
+            print(self.filters_names)
+            if fix >= fix and self.filters_names[fname] > 0:
+                print("found !")
+                self.filters_names[fname] -= 1
         if name not in self.filters_names:
             return False
 
@@ -289,9 +310,6 @@ class FilterFeed():
         self.filters.pop(ix)
         del self.filters_names[name]
         # Rearrange
-        for fname, fix in self.filters_names.items():
-            if fix >= ix:
-                self.filters_names[fname] -= 1
 
     def get_filters(self):
         return self.filters
@@ -340,7 +358,7 @@ class VideoDashboardFrame(Module):
         self.therm_frame.grid(row=0, column=1, padx=10, pady=10)
 
         # Cursor of rgb on thermal
-        self.corresponding_cursor = None
+        self.corresponding_cursor = (-1,-1)
         
         # Temperature label
         self.current_temp = tk.StringVar()
@@ -400,6 +418,8 @@ class VideoDashboardFrame(Module):
 
     def update_mask_filters(self):
         self.rgb_filters.clean()
+
+        # Matching point
         for matching_pt in self.img_matching_pts['rgb']:
             if not matching_pt:
                 continue
@@ -414,16 +434,10 @@ class VideoDashboardFrame(Module):
             filt = self.therm_filters.create_filter(Filters.draw_x, matching_pt,
                                             color=255, size=15, thickness=2)
             self.therm_filters.add_filter(filt, index=0)
-       
+        # Corresponding Cursor
         if self.corresponding_cursor:
             filt = self.therm_filters.create_filter(Filters.draw_x, self.corresponding_cursor, color=255, size=25, thickness=2)
             self.therm_filters.add_filter(filt, name="CorrespondingCursor")
-
-#        for filt in self.runtime_filters['rgb']:
-#            self.rgb_filters.add_filter(filt)
-#        
-#        for filt in self.runtime_filters['therm']:
-#            self.therm_filters.add_filter(filt)
 
         self.runtime_filters = {'rgb':[], 'therm':[]}
 
@@ -462,6 +476,7 @@ class VideoDashboardFrame(Module):
         char = event.char.lower()
         if widget == self.rgb_frame:
             fmap = {
+                'd': partial(self.debugme),
                 'l':partial(self.select_temp_panel1, x=event.x, y=event.y),
                 'h':partial(self.select_temp_panel2, x=event.x, y=event.y),
                 '1':partial(self.select_matching_point, x=event.x, y=event.y, pic='rgb', ix=0),
@@ -479,6 +494,10 @@ class VideoDashboardFrame(Module):
             f=fmap[char]
             f()
 
+    def debugme(self):
+        print("FILTERS:", self.rgb_filters.filters)
+        print("PFILTERS:", self.rgb_pfilters.filters_names)
+
     def select_temp_panel1(self, x,y):
         """
         PIXELS ARE RGB --> CONVERT THEM
@@ -486,10 +505,11 @@ class VideoDashboardFrame(Module):
         therm_pt = self.convert_point_rgb2therm((x,y))
         self.calibration_frame.select_panel1(*therm_pt)
 
-        filt = self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
-        self.therm_filters.add_filter(filt)
-        filt = self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
-        self.rgb_filters.add_filter(filt)
+        therm_filt = self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
+        rgb_filt = self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
+
+        self.therm_pfilters.add_filter(therm_filt, name="panel1_coords", overwrite=True)
+        self.rgb_pfilters.add_filter(rgb_filt, name="panel1_coords", overwrite=True)
 
     def select_temp_panel2(self, x,y):
         """
@@ -498,10 +518,11 @@ class VideoDashboardFrame(Module):
         therm_pt = self.convert_point_rgb2therm((x,y))
         self.calibration_frame.select_panel2(*therm_pt)
 
-        filt = self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
-        self.therm_filters.add_filter(filt)
-        filt = self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
-        self.rgb_filters.add_filter(filt)
+        therm_filt = self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
+        rgb_filt = self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
+
+        self.therm_pfilters.add_filter(therm_filt, name="panel2_coords", overwrite=True)
+        self.rgb_pfilters.add_filter(rgb_filt, name="panel2_coords", overwrite=True)
 
     def get_temperature(self, frame, point):
         return self.calibration_frame.get_temperature(frame, point)
