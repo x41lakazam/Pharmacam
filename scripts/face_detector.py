@@ -4,7 +4,6 @@ import os
 import time
 import sys
 
-import frames_io_handler as io
 from setup import Setup
 
 
@@ -34,7 +33,7 @@ def generate_data(n, out_dir, sleep=.2, background=False, gen_info=False):
         if background:
             name = 'bkg{}'.format(i)
         path = os.path.join(out_dir, name)
-        io.save_frame(Setup.VIDEO_PIPE, path, secure=False, totype=np.uint8)
+        #io.save_frame(Setup.VIDEO_PIPE, path, secure=False, totype=np.uint8)
         saved.append(path)
         time.sleep(sleep)
 

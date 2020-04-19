@@ -1,0 +1,13 @@
+- io_wrappers.py
+
+This file contains two sort of things, Camera classes and Stream classes. Cameras are wrappers for every camera, and Stream are wrappers that output data.
+
+Cameras: 
+Cameras have different captures modes: 
+- PIPESTREAM --> Every cameras that sends data to a named PIPE
+
+Streams:
+Streams are defined given the read mode of camera
+- PipeStream --> Reads data from a named, pipe, compatible with PIPESTREAM cameras.
+
+

@@ -16,9 +16,6 @@ import face_detector
 from face_detector import Person # Debug - remov
 
 class Filters:
-    """ 
-    Filters are functions that receive frames, and return frames
-    """
     
     cv_colors = {
         'Grayscale': None,
@@ -81,18 +78,10 @@ class Filters:
                 frame[x][y] = color
         frame[coords[1]][coords[0]] = color
         return frame
-    
-    @staticmethod
+
     def blur(frame, kernel_size=(5,5)):
         return cv.GaussianBlur(frame, kernel_size, 0)
-
-    @staticmethod
-    def convert_to_uint8(frame):
-        cv.normalize(frame, frame, 0, 255, cv.NORM_MINMAX)
-        frame       = frame.astype(np.uint8) 
-        return frame
     
-# Blocks
 
 class CalibrationFrame(tk.Frame):
      
@@ -101,7 +90,6 @@ class CalibrationFrame(tk.Frame):
         top = self.winfo_toplevel()
         
         box_properties = dict(height=1, width=4, padx=10, pady=10) 
-
         self.panel1_coords = (-1, -1) 
         self.panel1_textbox = tk.Text(self, **box_properties)
         self.panel1_label = tk.Label(self, text="Panel 1 (unselected):")
@@ -136,17 +124,17 @@ class CalibrationFrame(tk.Frame):
     def calibrate_temperature(self, frame):
         panel1_val  = float(frame[self.panel1_coords[1]][self.panel1_coords[0]])
         panel2_val  = float(frame[self.panel2_coords[1]][self.panel2_coords[0]])
-        
-        temp_function = utils.calibrate_temperature(self.panel1_temperature,
-                                                    self.panel2_temperature,
-                                                    panel1_val,
-                                                    panel2_val
-                                            )
+
+        m = (self.panel1_temperature - self.panel2_temperature) / (panel2_val - panel1_val) 
+
+        p = self.panel1_temperature - m * panel1_val 
+        temp_function = lambda dl: m*dl + p
+
         return temp_function
 
     def get_temperature(self, frame, point):
         point_val = float(frame[point[1]][point[0]])
-        scale     = self.calibrate_temperature(frame)
+        scale = self.calibrate_temperature(frame)
         
         temperature = scale(point_val)
 
@@ -156,28 +144,26 @@ class CalibrationFrame(tk.Frame):
 class VideoFrame(tk.Frame):
 
     def __init__(self, master=None, stream=None):
-
         tk.Frame.__init__(self, master)
         top = self.winfo_toplevel()
-
-        self.stream         = stream
 
         self.selected_color = tk.StringVar()
 
         self.current_temp = tk.StringVar()
         self.current_temp.set("Temperature: 0")
-
         self.init_temp_label()
         self.init_color_select()
+
+        self.stream         = stream
         
         self.init_panel()
 
         self.video_thread   = threading.Thread(target=self.video_loop)
         self.stop_video     = threading.Event()
+        self.video_thread.start()
+        
         
         self.init_calibration_frame()
-
-        self.video_thread.start()
 
         
     def init_color_select(self):
@@ -198,11 +184,7 @@ class VideoFrame(tk.Frame):
 
         # Bind click to --> change temperature
         self.panel.bind('<Button-1>', self.pick_temperature)
-
-        # Bind Key to  --> key_press_handler
         self.panel.bind('<Key>', self.key_press_handler)
-
-        # Bind Enter to  --> Focus panel
         self.panel.bind('<Enter>', self.focus_panel)
 
     def init_calibration_frame(self):
@@ -221,11 +203,6 @@ class VideoFrame(tk.Frame):
         if char in fmap.keys():
             f=fmap[char]
             f()
-
-    def pick_temperature(self, event):
-        temp = self.get_temperature(self.stream.current_frame, (event.x, event.y))
-        self.update_temperature(temp)
-        return temp
  
     def select_temp_panel1(self, x, y):
         self.calibration_frame.select_panel1(x, y)
@@ -238,7 +215,12 @@ class VideoFrame(tk.Frame):
     
     def get_temperature(self, frame, point):
         return self.calibration_frame.get_temperature(frame, point)
-    
+
+    def pick_temperature(self, event):
+        temp = self.get_temperature(self.stream.current_frame, (event.x, event.y))
+        self.update_temperature(temp)
+        return temp
+        
     def update_panel(self, frametk):
         self.panel.imgtk = frametk
         self.panel.configure(image=self.panel.imgtk)
@@ -247,26 +229,18 @@ class VideoFrame(tk.Frame):
         return frame
 
     def filter_frame(self, frame):
-        
-        # Convert frame to uint8 because uint16 isn't supported by PIL
-
-        frame = Filters.convert_to_uint8(frame)
-
-        # Apply face detection
-        frame = Filters.face_detection(frame)
-
-        # Blur frame
-        #frame = Filters.blur(frame)
-        
-        # Apply colormap filter
         if self.selected_color.get() != 'None':
             frame = Filters.color_filter(frame, self.selected_color.get())
         
-        # Draw X on selected points
+        frame = Filters.face_detection(frame)
+        frame = Filters.blur(frame)
+
         if self.calibration_frame.panel1_coords[0] != -1:
             frame = Filters.draw_x(frame, self.calibration_frame.panel1_coords)
+
         if self.calibration_frame.panel2_coords[0] != -1:
             frame = Filters.draw_x(frame, self.calibration_frame.panel2_coords)
+
 
         return frame
     
@@ -277,19 +251,22 @@ class VideoFrame(tk.Frame):
             if self.stop_video.is_set():
                 return 1                
                 
-            frame       = self.stream.read()    # Get frame
-            original    = frame.copy()          # Copy it
+            frame       = self.stream.read()
+            original    = frame.copy()
 
+            # Change frame to uint8 because uint16 isn't supported by PIL
+            cv.normalize(frame, frame, 0, 255, cv.NORM_MINMAX)
+            frame       = frame.astype(np.uint8) 
             frame       = self.filter_frame(frame)
             frame       = self.resize_frame(frame)
 
             # Convert to tkinter frame
-            tkframe = ImageTk.PhotoImage(Image.fromarray(frame))
+            frame = Image.fromarray(frame)
+            frame = ImageTk.PhotoImage(frame)
             
             # Display it
-            self.update_panel(tkframe)
-           
-            # Sleep a bit
+            self.update_panel(frame)
+            
             time.sleep(1/Setup.VIDEO_FPS)
 
         return 1
@@ -298,6 +275,7 @@ class VideoFrame(tk.Frame):
         self.stream.stop()
         self.stop_video.set()
 
+    
 
 class ReportFrame(tk.Frame):
     
@@ -383,5 +361,6 @@ def on_close():
     main.destroy()
 
 main.protocol("WM_DELETE_WINDOW", on_close)
+        
 
 main.mainloop()
