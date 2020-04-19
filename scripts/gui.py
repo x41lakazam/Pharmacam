@@ -126,9 +126,10 @@ class CalibrationFrame(Module):
 
 class VideoFrame(Module):
 
-    def __init__(self, master=None, stream=None, filter_feed=None):
+    def __init__(self, master=None, stream=None, filter_feed=None, perma_filter_feed=None):
         
         self.filter_feed = filter_feed
+        self.perma_filter_feed = perma_filter_feed
 
         super().__init__(master)
         top = self.winfo_toplevel()
@@ -158,13 +159,9 @@ class VideoFrame(Module):
         self.panel = tk.Label(self, anchor=tk.NW, cursor='tcross')
         self.panel.grid(row=2, column=0)
 
-        # Bind Enter to  --> Focus panel
-        self.panel.bind('<Enter>', self.focus_panel)
-
-        # Bind Key to  --> key_press_handler
+        self.panel.bind('<Enter>', self.enter_handler)
         self.panel.bind('<Key>', self.key_press_handler)
-
-        # Bind motion to --> motion_handler
+        self.panel.bind('<Leave>', self.leave_handler)
         self.panel.bind('<Motion>', self.motion_handler)
 
     def init_ready_label(self):
@@ -173,11 +170,20 @@ class VideoFrame(Module):
         self.ready_label = tk.Label(self, textvariable=self.ready_text)
         self.ready_label.grid(row=3, column=0)
 
-    def focus_panel(self, event):
+    def focus_panel(self):
         self.panel.focus_set()
 
+    def enter_handler(self, event):
+        self.focus_panel()
+
+    def leave_handler(self, event):
+        self.perma_filter_feed.remove_filter('zoom_glass')
+
     def motion_handler(self, event):
+        self.perma_filter_feed.remove_filter('zoom_glass')
         self.master.widget_press_callback(event, self)
+        zoomglass_filter = lambda f: Filters.zoom_glass(f, coords=(event.x, event.y))
+        self.perma_filter_feed.add_filter(zoomglass_filter, name="zoom_glass")
 
     def key_press_handler(self, event):
         self.master.widget_press_callback(event, self)
@@ -191,7 +197,6 @@ class VideoFrame(Module):
 
     def filter_frame(self, frame):
         
-
         # Convert frame to uint8 because uint16 isn't supported by PIL
 
         frame = Filters.convert_to_uint8(frame)
@@ -217,12 +222,16 @@ class VideoFrame(Module):
                 #333 Above is better, but for debugging, lets remove the try
                 frame = f(frame)
 
+        if self.perma_filter_feed:
+            for f in self.perma_filter_feed.get_filters():
+                frame = f(frame)
 
         return frame
     
     def video_loop(self):
 
         while True:
+
 
             if self.stop_video.is_set():
                 return 1                
@@ -251,16 +260,40 @@ class VideoFrame(Module):
 class FilterFeed():
     def __init__(self):
         self.filters = []
+        self.filters_names = {}
     
-    def add_filter(self, f):
-        self.filters.append(f)
+    def add_filter(self, f, index=-1, name=None):
+        if index != -1:
+            for filter_name, filter_ix in self.filters_names.items():
+                if filter_ix >= index:
+                    self.filters_names[filter_name] += 1
+
+        self.filters.insert(index, f)
+        if name:
+            self.filters_names[name] = index
 
     def create_filter(self, func, *args, **kwargs):
         """
         Create filter from func args and kwargs and append it to filters
+        index: use index to insert filter at a special index
         """
         filt = lambda frame: func(frame, *args, **kwargs)
-        self.add_filter(filt)
+        return filt
+
+    def remove_filter(self, name):
+        """
+        Can only be performed if filter has a name.
+        """
+        if name not in self.filters_names:
+            return False
+
+        ix = self.filters_names[name]
+        self.filters.pop(ix)
+        del self.filters_names[name]
+        # Rearrange
+        for fname, fix in self.filters_names.items():
+            if fix >= ix:
+                self.filters_names[fname] -= 1
 
     def get_filters(self):
         return self.filters
@@ -269,7 +302,7 @@ class FilterFeed():
         self.filters = []
 
     def update_filters(self, filters):
-        self.clean_filters
+        self.clean()
         self.filters = [filters]
 
 class VideoDashboardFrame(Module):
@@ -284,23 +317,27 @@ class VideoDashboardFrame(Module):
         
         # Video 1 (RGB)
 
-        rgb_camera               = capture.WebcamCamera(cam_id=1)
+        rgb_camera               = capture.WebcamCamera(cam_id=0)
         self.rgb_stream          = capture.WebcamStream(rgb_camera)
 
         self.rgb_filters         = FilterFeed()
+        self.rgb_pfilters        = FilterFeed()
         self.rgb_frame           = VideoFrame(self, 
                                                 stream=self.rgb_stream, 
-                                                filter_feed=self.rgb_filters)
+                                                filter_feed=self.rgb_filters, 
+                                                perma_filter_feed=self.rgb_pfilters)
 
         self.rgb_frame.grid(row=0, column=0, padx=10, pady=10)
 
         # Video 2 (Therm)
         self.therm_filters       = FilterFeed()
+        self.therm_pfilters      = FilterFeed()
         therm_camera             = capture.OpgalCamera()
         self.therm_stream        = capture.PipeStream(therm_camera, Setup.VIDEO_PIPE)
 
         self.therm_frame         = VideoFrame(self, stream=self.therm_stream,
-                                                    filter_feed=self.therm_filters)
+                                                    filter_feed=self.therm_filters,
+                                                    perma_filter_feed=self.therm_pfilters)
        
         self.therm_frame.grid(row=0, column=1, padx=10, pady=10)
 
@@ -368,15 +405,17 @@ class VideoDashboardFrame(Module):
         for matching_pt in self.img_matching_pts['rgb']:
             if not matching_pt:
                 continue
-            self.rgb_filters.create_filter(Filters.draw_x, matching_pt,
+            filt = self.rgb_filters.create_filter(Filters.draw_x, matching_pt,
                                             color=255, size=15, thickness=2)
+            self.rgb_filters.add_filter(filt, index=0)
 
         self.therm_filters.clean()
         for matching_pt in self.img_matching_pts['therm']:
             if not matching_pt:
                 continue
-            self.therm_filters.create_filter(Filters.draw_x, matching_pt,
+            filt = self.therm_filters.create_filter(Filters.draw_x, matching_pt,
                                             color=255, size=15, thickness=2)
+            self.rgb_filters.add_filter(filt, index=0)
         
         self.therm_filters.create_filter(Filters.draw_x, self.corresponding_cursor, color=255, size=25, thickness=2)
 
@@ -440,7 +479,6 @@ class VideoDashboardFrame(Module):
             f=fmap[char]
             f()
 
-
     def select_temp_panel1(self, x,y):
         """
         PIXELS ARE RGB --> CONVERT THEM
@@ -448,8 +486,10 @@ class VideoDashboardFrame(Module):
         therm_pt = self.convert_point_rgb2therm((x,y))
         self.calibration_frame.select_panel1(*therm_pt)
 
-        self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
-        self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
+        filt = self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
+        self.therm_filters.add_filter(filt)
+        filt = self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
+        self.rgb_filters.add_filter(filt)
 
     def select_temp_panel2(self, x,y):
         """
@@ -458,8 +498,10 @@ class VideoDashboardFrame(Module):
         therm_pt = self.convert_point_rgb2therm((x,y))
         self.calibration_frame.select_panel2(*therm_pt)
 
-        self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
-        self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
+        filt = self.therm_filters.create_filter(Filters.draw_x, therm_pt, color=255, thickness=3, size=3)
+        self.therm_filters.add_filter(filt)
+        filt = self.rgb_filters.create_filter(Filters.draw_x, (x,y), color=255, thickness=3, size=3)
+        self.rgb_filters.add_filter(filt)
 
     def get_temperature(self, frame, point):
         return self.calibration_frame.get_temperature(frame, point)
