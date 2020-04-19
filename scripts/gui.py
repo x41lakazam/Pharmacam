@@ -159,7 +159,7 @@ class VideoFrame(Module):
         self.panel.grid(row=2, column=0)
 
         # Bind Enter to  --> Focus panel
-        self.panel.bind('<Enter>', self.focus_panel)
+        self.panel.bind('<Enter>', self.enter_handler)
 
         # Bind Key to  --> key_press_handler
         self.panel.bind('<Key>', self.key_press_handler)
@@ -173,8 +173,14 @@ class VideoFrame(Module):
         self.ready_label = tk.Label(self, textvariable=self.ready_text)
         self.ready_label.grid(row=3, column=0)
 
-    def focus_panel(self, event):
+    def display_zoomed_video(self, position):
+        pass
+
+    def focus_panel(self):
         self.panel.focus_set()
+
+    def enter_handler(self, event):
+        self.focus_panel()
 
     def motion_handler(self, event):
         self.master.widget_press_callback(event, self)
@@ -185,12 +191,11 @@ class VideoFrame(Module):
     def update_panel(self, frametk):
         self.panel.imgtk = frametk
         self.panel.configure(image=self.panel.imgtk)
-    
+
     def resize_frame(self, frame):
         return frame
 
     def filter_frame(self, frame):
-        
 
         # Convert frame to uint8 because uint16 isn't supported by PIL
 
@@ -284,7 +289,7 @@ class VideoDashboardFrame(Module):
         
         # Video 1 (RGB)
 
-        rgb_camera               = capture.WebcamCamera(cam_id=1)
+        rgb_camera               = capture.WebcamCamera(cam_id=0)
         self.rgb_stream          = capture.WebcamStream(rgb_camera)
 
         self.rgb_filters         = FilterFeed()
@@ -295,13 +300,22 @@ class VideoDashboardFrame(Module):
         self.rgb_frame.grid(row=0, column=0, padx=10, pady=10)
 
         # Video 2 (Therm)
-        self.therm_filters       = FilterFeed()
-        therm_camera             = capture.OpgalCamera()
-        self.therm_stream        = capture.PipeStream(therm_camera, Setup.VIDEO_PIPE)
+        # TEST SESSION:
+        # REAL:
+        #self.therm_filters       = FilterFeed()
+        #therm_camera             = capture.OpgalCamera()
+        #self.therm_stream        = capture.PipeStream(therm_camera, Setup.VIDEO_PIPE)
 
+        #self.therm_frame         = VideoFrame(self, stream=self.therm_stream,
+        #                                            filter_feed=self.therm_filters)
+
+        #self.therm_frame.grid(row=0, column=1, padx=10, pady=10)
+
+        # TEST:
+        self.therm_stream        = self.rgb_stream
         self.therm_frame         = VideoFrame(self, stream=self.therm_stream,
                                                     filter_feed=self.therm_filters)
-       
+
         self.therm_frame.grid(row=0, column=1, padx=10, pady=10)
 
         # Cursor of rgb on thermal

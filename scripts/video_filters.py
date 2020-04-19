@@ -2,10 +2,10 @@ import cv2 as cv
 import numpy as np
 
 class Filters:
-    """ 
+    """
     Filters are functions that receive frames, and return frames
     """
-    
+
     cv_colors = {
         'Grayscale': None,
         'Reverted': lambda f: 255 - f,
@@ -87,4 +87,12 @@ class Filters:
         cv.normalize(frame, frame, 0, 255, cv.NORM_MINMAX)
         frame       = frame.astype(np.uint8) 
         return frame
-    
+
+    @staticmethod
+    def zoom_glass(frame, position=(0,0), zoom=4, glass_size=(200, 200)):
+        """
+        Display a zoom of the video on a small square
+        """
+        window_px = (glass_size[0] // zoom, glass_size[1] // zoom)
+        pass
+
